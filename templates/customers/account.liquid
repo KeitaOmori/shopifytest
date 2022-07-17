@@ -1,118 +1,481 @@
-{{ 'customer.css' | asset_url | stylesheet_tag }}
+{%- assign customer_metafields = customer.metafields.status -%}
+{{ 'account.scss' | asset_url | stylesheet_tag }}
 
-<div class="customer account">
-  <div>
-    <h1>{{ 'customer.account.title' | t }}</h1>
-    <a href="{{ routes.account_logout_url }}">
-      <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false" fill="none" viewBox="0 0 18 19">
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M6 4.5a3 3 0 116 0 3 3 0 01-6 0zm3-4a4 4 0 100 8 4 4 0 000-8zm5.58 12.15c1.12.82 1.83 2.24 1.91 4.85H1.51c.08-2.6.79-4.03 1.9-4.85C4.66 11.75 6.5 11.5 9 11.5s4.35.26 5.58 1.15zM9 10.5c-2.5 0-4.65.24-6.17 1.35C1.27 12.98.5 14.93.5 18v.5h17V18c0-3.07-.77-5.02-2.33-6.15-1.52-1.1-3.67-1.35-6.17-1.35z" fill="currentColor">
-      </svg>
-      {{ 'customer.log_out' | t }}
-    </a>
+<!--// PG EMAIL VERIFIED CUSTOMER LOGIC START //-->
+{%- if customer_metafields['email_verified'] != blank or customer_metafields['email_not_verified'] == blank -%}
+  <script>
+  (function() {
+    // check last_url
+    PG_check_last_url();
+    // check if needs to go to checkout
+    PG_check_goto_cart();
+    PG_check_goto_checkout('{{ shop.permanent_domain }}', '{{ customer.email }}', '{{ customer.name }}','{{ settings.pg_checkout_page_url }}');
+  })();
+  </script>
+{%- endif -%}
+<!--// PG EMAIL VERIFIED CUSTOMER LOGIC START //-->
+
+{% comment %}NOTE: 独自チェックアウトページから戻ってきたときにカート内を空にする{% endcomment %}
+{% comment %}NOTE: 独自チェックアウトページ機能をONにすると利用可能{% endcomment %}
+{%- if settings.pg_use_another_checkout_page -%}
+  <script>
+    window.onload = function () {
+      var target_string = /cart_clear=true/;
+      // NOTE: url に cart_clear=true が含まれている場合、cart_api で cart をクリアする
+      if (window.location.href.match(target_string)) {
+        var ele = document.getElementsByClassName('site-header__cart-count');
+        // NOTE: ヘッダーのカートアイコンの数字を見えないようにします
+        ele[0].classList.add("hide");
+        jQuery.post(
+          '/cart/clear.js'
+        );
+      }
+    }
+  </script>
+{%- endif -%}
+
+<div class="custom-style-account-first-div">
+
+  <!--// PG MYPAGE HEADER START //-->
+  {%- if settings.pg_other_mypage_header != "-" -%}
+    {{ settings.pg_other_mypage_header }}
+  {%- endif -%}
+  <!--// PG MYPAGE HEADER END //-->
+
+  <div class="section-header text-center" style="margin-bottom: 16px;">
+    {%- if customer_metafields['email_verified'] != blank or settings.pg_idon_use_or_no_use == false -%}
+      <h1 class="section-header-text custom-style-account-title">{{ 'customer.account.title' | t }}</h1>
+    {%- else -%}
+      <h1 class="myaccount__authenticate-title custom-style-account-title">{%- include 'pg_ja_get', target: 'mypage_header_mail_auth' -%}</h1>
+    {%- endif -%}
   </div>
 
-  <div>
-    <div>
-      <h2>{{ 'customer.orders.title' | t }}</h2>
-
-      {% paginate customer.orders by 20 %}
-        {%- if customer.orders.size > 0 -%}
-          <table role="table" class="order-history">
-            <caption class="visually-hidden">{{ 'customer.orders.title' | t }}</caption>
-            <thead role="rowgroup">
-              <tr role="row">
-                <th id="ColumnOrder" scope="col" role="columnheader">{{ 'customer.orders.order_number' | t }}</th>
-                <th id="ColumnDate" scope="col" role="columnheader">{{ 'customer.orders.date' | t }}</th>
-                <th id="ColumnPayment" scope="col" role="columnheader">{{ 'customer.orders.payment_status' | t }}</th>
-                <th id="ColumnFulfillment" scope="col" role="columnheader">{{ 'customer.orders.fulfillment_status' | t }}</th>
-                <th id="ColumnTotal" scope="col" role="columnheader">{{ 'customer.orders.total' | t }}</th>
-              </tr>
-            </thead>
-            <tbody role="rowgroup">
-              {%- for order in customer.orders -%}
-                <tr role="row">
-                  <td
-                    id="RowOrder"
-                    role="cell"
-                    headers="ColumnOrder"
-                    data-label="{{ 'customer.orders.order_number' | t }}"
-                  >
-                    <a href="{{ order.customer_url }}" aria-label="{{ 'customer.orders.order_number_link' | t: number: order.name }}">
-                      {{ order.name }}
-                    </a>
-                  </td>
-                  <td headers="RowOrder ColumnDate" role="cell" data-label="{{ 'customer.orders.date' | t }}">
-                    {{ order.created_at | time_tag: format: 'date' }}
-                  </td>
-                  <td headers="RowOrder ColumnPayment" role="cell" data-label="{{ 'customer.orders.payment_status' | t }}">
-                    {{ order.financial_status_label }}
-                  </td>
-                  <td headers="RowOrder ColumnFulfillment" role="cell" data-label="{{ 'customer.orders.fulfillment_status' | t }}">
-                    {{ order.fulfillment_status_label }}
-                  </td>
-                  <td headers="RowOrder ColumnTotal" role="cell" data-label="{{ 'customer.orders.total' | t }}">
-                    {{ order.total_price | money_with_currency }}</td>
-                </tr>
-              {%- endfor -%}
-            </tbody>
-          </table>
-        {%- else -%}
-          <p>{{ 'customer.orders.none' | t }}</p>
-        {%- endif -%}
-
-        {%- if paginate.pages > 1 -%}
-          {%- if paginate.parts.size > 0 -%}
-              <nav class="pagination" role="navigation" aria-label="{{ 'general.pagination.label' | t }}">
-                <ul role="list">
-                {%- if paginate.previous -%}
-                  <li>
-                    <a href="{{ paginate.previous.url }}" aria-label="{{ 'general.pagination.previous' | t }}">
-                      <svg aria-hidden="true" focusable="false" viewBox="0 0 10 6">
-                        <path fill-rule="evenodd" clip-rule="evenodd" d="M9.354.646a.5.5 0 00-.708 0L5 4.293 1.354.646a.5.5 0 00-.708.708l4 4a.5.5 0 00.708 0l4-4a.5.5 0 000-.708z" fill="currentColor">
-                      </svg>
-                    </a>
-                  </li>
-                {%- endif -%}
-
-                {%- for part in paginate.parts -%}
-                  <li>
-                    {%- if part.is_link -%}
-                      <a href="{{ part.url }}" aria-label="{{ 'general.pagination.page' | t: number: part.title }}">{{ part.title }}</a>
-                    {%- else -%}
-                      {%- if part.title == paginate.current_page -%}
-                        <span aria-current="page" aria-label="{{ 'general.pagination.page' | t: number: part.title }}">{{ part.title }}</span>
-                      {%- else -%}
-                        <span>{{ part.title }}</span>
-                      {%- endif -%}
-                    {%- endif -%}
-                  </li>
-                {%- endfor -%}
-
-                {%- if paginate.next -%}
-                  <li>
-                    <a href="{{ paginate.next.url }}" aria-label="{{ 'general.pagination.next' | t }}" >
-                      <svg aria-hidden="true" focusable="false" viewBox="0 0 10 6">
-                        <path fill-rule="evenodd" clip-rule="evenodd" d="M9.354.646a.5.5 0 00-.708 0L5 4.293 1.354.646a.5.5 0 00-.708.708l4 4a.5.5 0 00.708 0l4-4a.5.5 0 000-.708z" fill="currentColor">
-                      </svg>
-                    </a>
-                  </li>
-                {%- endif -%}
-                </ul>
-              </nav>
-          {%- endif -%}
-        {%- endif -%}
-      {% endpaginate %}
+  {%- if settings.pg_prod_permanent_domain == "mixaticket.myshopify.com" -%}
+    <div style="text-align: center;">
+        <svg id="svgcode"></svg>
     </div>
+  {%- endif -%}
 
-    <div>
-      <h2>{{ 'customer.account.details' | t }}</h2>
+  {%- if settings.pg_prod_permanent_domain == "passport.bushiroad-music.com" or settings.pg_prod_permanent_domain == "bmpassport-demo.myshopify.com" -%}
 
-      {{ customer.default_address | format_address }}
+    {%- include 'bushi-licence' -%}
 
-      <a href="{{ routes.account_addresses_url }}">
-        {{ 'customer.account.view_addresses' | t }} ({{ customer.addresses_count }})
+    <div class="change-info-container">
+      <div class="change-user-info-container">
+        <a href="/account?view=edit">
+          <div style="padding: 27px 24px 24px 24px;">
+            <div class="change-info-content-head">
+              <div>{%- include 'pg_person_icon' -%}</div>
+              <div class="change-info-title">{%- include 'pg_ja_get', target: 'bushiroad_change_info_title' -%}</div>
+            </div>
+            <div class="change-info-explain-text">{%- include 'pg_ja_get', target: 'bushiroad_change_info_description' -%}</div>
+          </div>
+        </a>
+      </div>
+      <div class="top-margin-container">
+        <div class="change-email-container">
+          <a href="/account?view=edit">
+            <div style="padding: 27px 24px 24px 24px;">
+              <div class="change-info-content-head">
+                <div>{%- include 'pg_email_icon' -%}</div>
+                <div class="change-info-title">{%- include 'pg_ja_get', target: 'bushiroad_change_mail_title' -%}</div>
+              </div>
+              <div class="change-info-explain-text">{%- include 'pg_ja_get', target: 'bushiroad_change_mail_description' -%}</div>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <div class="top-margin-container">
+        <div class="change-favorite-container">
+          <a href="/account?view=edit">
+            <div style="padding: 27px 24px 24px 24px;">
+              <div class="change-info-content-head">
+                <div>{%- include 'pg_check_box_icon' -%}</div>
+                <div class="change-info-title">{%- include 'pg_ja_get', target: 'bushiroad_change_favorite_title' -%}</div>
+              </div>
+              <div class="change-info-explain-text">{%- include 'pg_ja_get', target: 'bushiroad_change_favorite_description' -%}</div>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  {%- endif -%}
+
+  {%- if settings.pg_use_other_my_page -%}
+    <div class="myaccount__other_mypage_link_container">
+      {%- assign other_my_page_link = settings.pg_other_my_page_link -%}
+      {%- assign link_info = settings.pg_other_my_page_link_info -%}
+      <a href="{{ other_my_page_link }}" target="_blank">
+        <div class="myaccount__other_mypage_link_button">
+          <div class="myaccount__other_mypage_link_button_text">{{ settings.pg_other_my_page_link_text }}</div>
+        </div>
       </a>
+      {%- if settings.pg_use_other_my_page_link_info -%}
+        <div class="myaccount__other_mypage_link_info">{{ link_info }}</div>
+      {%- endif -%}
     </div>
+  {%- endif -%}
 
+  {%- if customer != null -%}
+    <div class="myaccount_caution myaccount__orders-container-for-tablet">
+      <div>{{ settings.pg_customers_account_caution }}</div>
+      {% comment %}NOTE: 下記の実装は注意事項の表示の方向性定まるまで残しておきます{% endcomment %}
+      {% comment %}
+      <a href="#" onclick="PG_show_info()">
+        <div class="myaccount_caution-container">
+          <div class="moala-ticket-info-icon">{{ 'info-24px.svg' | asset_url | img_tag }}</div>
+          <div>MOALA Ticketをご購入の方へ</div>
+          <div id="pg_baloon" class="balloon-close">
+            <text class="balloon-text">チケット購入後、電子チケット（MOALA Ticket）のURLがメールで届きます。チケット情報はマイページからもご確認いただけますが、反映に時間がかかる可能性がございます。</text>
+          </div>
+        </div>
+      </a>
+      {% endcomment %}
+    </div>
+  {%- endif -%}
+
+  <div class="myaccount">
+
+    {%- if customer_metafields['email_verified'] != blank or customer_metafields['email_not_verified'] == blank -%}
+
+      <!--// PG CUSTOMER ORDER HISTORY START //-->
+      <div class="customer-orders-wrapper">
+        <div>
+          <div class="customer-orders-title myaccount__orders-container-for-tablet">
+            <h2 class="customer-orders-title-text">{%- include 'pg_ja_get', target: 'mypage_order_history_title' -%}</h2>
+          </div>
+
+          {% paginate customer.orders by 10 %}
+            {% if customer.orders.size != 0 %}
+              <div>
+                {% for order in customer.orders %}
+                  <!--// PG REFUND META START //-->
+                  <!--// NOTE: metafieldsに入っている返金申し込み日を取得する //-->
+                  {%- assign refund_meta_value = order.metafields.order_refund -%}
+                  {%- assign refund_date = refund_meta_value['date'] -%}
+                  {%- assign resale_product_ids = order.metafields.resale_status['resale_product_ids'] -%}
+                  <!--// PG REFUND META END //-->
+                  {%- assign order_lineitem_first = order.line_items | first -%}
+                  <div class="order-content-base maypage-order-wrapper-{{order_lineitem_first.product_id}}">
+                    <div class="order-container myaccount__orders-container-for-tablet">
+                      <div class="order-head">
+                        <div class="order-content-tag-area">
+                          {%- comment -%}<!--// NOTE: 注文内の商品で返金対象のものがないかタグで探索している //-->{%- endcomment -%}
+                          {%- for item in order.line_items -%}
+                            {%- for tag in item.product.tags -%}
+                              {%- assign refund_tag = tag | split: ":" -%}
+                              {%- if refund_tag.size > 1 and refund_tag[0] == "refund" -%}
+                                {%- assign refund_flag = refund_tag[1] -%}
+                                {%- break -%}
+                              {%- endif -%}
+                            {%- endfor -%}
+                          {%- endfor -%}
+                          {%- render 'pg_financial_status_tag', use_refund: settings.pg_order_refund, order: order, refund_date: refund_date, refund_flag: refund_flag -%}
+
+                          {%- assign is_displayed_shipping_info = false -%}
+                          {%- for item in order.line_items -%}
+                            {%- for variant in item.product.variants -%}
+                              {%- if variant.requires_shipping and is_displayed_shipping_info == false -%}
+                                {%- render 'pg_fulfillment_status_tag', order: order -%}
+                                {%- assign is_displayed_shipping_info = true -%}
+                                {%- break -%}
+                              {%- endif -%}
+                            {%- endfor -%}
+                          {%- endfor -%}
+
+                        </div>
+                        {%- comment -%}NOTE: ストアで返金機能ON、返金対象商品あり、支払い済み、かつ注文キャンセル済みの場合返金対象です{%- endcomment -%}
+                        {%- if refund_flag == "yes" and refund_date == blank and order.financial_status == 'paid' and order.cancelled-%}
+                          <div class="refund-status-explanation-text">{%- include 'pg_ja_get', target: 'mypage_order_history_refund_text' -%}</div>
+                        {%- endif -%}
+                        <div class="order-head-info">
+                          <div>
+                            <text class="order-info-title-text">{%- include 'pg_ja_get', target: 'mypage_order_history_number' -%}</text>
+                            <a href="{{ order.customer_url }}">
+                              <text class="order-number-text">{{ order.name }}</text>
+                            </a>
+                          </div>
+                          <div>
+                            <text class="order-info-title-text">{%- include 'pg_ja_get', target: 'mypage_order_history_date' -%}</text>
+                            <text class="order-created_at-text" data-label="{{ 'customer.orders.date' | t }}">{{ order.created_at | time_tag: format: 'date' }}</text>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="order-content">
+                        {% for item in order.line_items %}
+                          {%- assign splited_resale_product_ids = resale_product_ids | split: ',' -%}
+                          {% comment %}NOTE: -1 or blankの場合はresaleされているものがない状態です{% endcomment %}
+                          {%- if splited_resale_product_ids[0] != "-1" or splited_resale_product_ids != blank -%}
+                            {%- render 'pg_resale_status_tag', splited_resale_product_ids: splited_resale_product_ids, product_id: item.product_id -%}
+                          {%- endif -%}
+                          <div class="order-item-container">
+                            <div class="order-item-detail">
+                              {%- comment -%}NOTE:GOODSとそれ以外でサムネイルのスタイルを分ける{%- endcomment -%}
+                              {%- if item.product.type == "goods" -%}
+                                <div class="order-goods-item-image-container">
+                                  <img src="{{ item.image.src | img_url: '40x40', scale: 2 }}">
+                                </div>
+                              {%- else -%}
+                                <div class="order-ticket-item-image-container">
+                                  <img src="{{ item.image.src | img_url: 'medium' }}">
+                                </div>
+                              {%- endif -%}
+
+                              <div class="order-item-info">
+                                <div class="order-item-info-text">
+                                  {%- if item.product.has_only_default_variant != true -%}
+                                    {%- assign variant_title = item.variant.title | replace: " ", "" | replace: "&nbsp;", "" -%}
+                                    {%- if variant_title != "" -%}
+                                      <div>{{ item.product.title }} - {{ variant_title }}</div>
+                                    {%- else -%}
+                                      <div>{{ item.product.title }}</div>
+                                    {%- endif -%}
+                                  {%- else -%}
+                                    <div>{{ item.product.title }}</div>
+                                  {%- endif -%}
+                                  {%- if item.product_id == blank -%}
+                                    <div>{{ item.title }}</div>
+                                  {%- endif -%}
+                                </div>
+                                <div class="order-item-quantity">{%- include 'pg_ja_get', target: 'mypage_order_history_quantity' -%}{{ item.quantity }}</div>
+                              </div>
+                            </div>
+                          </div>
+                        {% endfor %}
+                      </div>
+                      <div class="order-bottom">
+                        <a href="{{ order.customer_url }}" aria-label="{{ 'customer.orders.order_number_link' | t: number: order.name }}">
+                          <div class="order-detail-button-area">{%- include 'pg_ja_get', target: 'mypage_order_history_detail_button' -%}</div>
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="myaccount__no-order-text">
+                <div>{{ 'customer.orders.none' | t }}</div>
+              </div>
+            {% endif %}
+            {%- if paginate.pages > 1 -%}
+              <div class="myaccount_pagination-container">
+                {% include 'pg_pagination-1', paginate: paginate %}
+              </div>
+            {%- endif -%}
+          {% endpaginate %}
+        </div>
+      <!--// PG CUSTOMER ORDER HISTORY END //-->
+
+      {%- if settings.pg_use_subscription -%}
+        <!--// PG CUSTOMER SUBSCRIPTION ORDER HISTORY START //-->
+          <div class="account-menu-wrapper">
+            <div class="account-menu-container myaccount__orders-container-for-tablet">
+              <h2 class="account-menu-title">{%- include 'pg_ja_get', target: 'mypage_subscription_history_title' -%}</h2>
+              <div class="menu-btn-wrapper">
+                <a href="/account?hbSubscriptionPath=/">
+                  <div class="blue-bk-txt-btn">{%- include 'pg_ja_get', target: 'mypage_subscription_history_detail_button' -%}</div>
+                </a>
+              </div>
+            </div>
+          </div>
+        <!--// PG CUSTOMER SUBSCRIPTION ORDER HISTORY END //-->
+      {%- endif -%}
+
+      {% if settings.pg_use_customer_fields %}
+        <div class="account-menu-wrapper">
+          <div class="account-menu-container myaccount__orders-container-for-tablet">
+            <h2 class="account-menu-title">{{ settings.pg_customer_fields_account_edit_title }}</h2>
+            <div class="menu-btn-wrapper">
+              <a href="/account?view=edit">
+                <div class="edit-account-button">{{ settings.pg_customer_fields_account_edit_text }}</div>
+              </a>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <!--// PG CUSTOMER ADDRESS START //-->
+        <div class="account-menu-wrapper">
+          <div class="account-menu-container myaccount__orders-container-for-tablet">
+            <h2 class="account-menu-title">{{ 'customer.account.details' | t }}</h2>
+            <div style="margin-top: 28px;">
+              {% for address in customer.addresses %}
+                {{ address.last_name }} {{ address.first_name }}<br>
+                {{ address.zip }}<br>
+                {{ address.province }} {{ address.city }} {{ address.address1 }}<br>
+                {%- if address.address2 != blank -%}{{ address.address2 }}<br>{%- endif -%}
+                {{ address.country }}
+              {% endfor %}
+            </div>
+
+            <div class="menu-btn-wrapper">
+              <a href="{{ routes.account_addresses_url }}">
+                <div class="blue-bk-txt-btn">{%- include 'pg_ja_get', target: 'mypage_address_detail_button' -%}</div>
+              </a>
+            </div>
+
+            <div class="myaccount__logout-button-container">
+              {%- if settings.pg_store_group_code == "kodansha" -%}
+                {%- include 'pg_kodansha_logout_button' -%}
+              {%- else -%}
+
+                <div class="menu-btn-wrapper">
+                  <a href="/account/logout">
+                    <div class="blue-txt-white-bk-btn">
+                      {%- include 'pg_ja_get', target: 'mypage_logout' -%}
+                    </div>
+                  </a>
+                </div>
+              {%- endif -%}
+            </div>
+
+            <!--// PG UNSUBSCRIBE BUTTON START //-->
+            {%- if settings.pg_store_group_code == "kodansha" -%}
+              {%- include 'pg_kodansha_unsubscribe' -%}
+            {%- endif -%}
+            {%- if settings.pg_store_group_code == "mec" -%}
+              {%- include 'pg_mec_unsubscribe' -%}
+            {%- endif -%}
+            <!--// PG UNSUBSCRIBE BUTTON END //-->
+
+          </div>
+        </div>
+      </div>
+      <!--// PG CUSTOMER ADDRESS START //-->
+    {%- else -%}
+      {%- comment -%} FC連携でのメール認証用ページ {%- endcomment -%}
+      <div id="PG_idcon_verify_section" class="myaccount__id-connect-page-wrapper">
+
+        <div class="myaccount__code-input-form">
+          ログインにはメールアドレスの認証が必要です。<br>
+          認証メールに記載された6桁のコードを入力し、認証を完了してください。 <br>
+          認証後、商品を購入いただけるようになります。
+        </div>
+
+        <!--// PG STEP 1 START //-->
+        <div class="myaccount__authenticate-step1-title">
+          Step. 1
+        </div>
+
+        <div class="myaccount__authenticate-step1-text">
+          メールアドレスを入力してください。認証メールが届きます。
+        </div>
+
+        <div class="myaccount__authenticate-step1-input-label">
+          メールアドレス
+        </div>
+
+        <div id="PG_VerifyEmail_error"></div>
+
+        <div class="myaccount__authenticate-step1-input-container">
+          <input
+            type="email"
+            style="height: 56px;width: 100%;"
+            value=""
+            name="email"
+            id="VerifyEmail"
+            class="input-full{% if form.errors %} input--error{% endif %}"
+            autocorrect="off"
+            autocapitalize="off"
+            onchange="PG_idcon_control_btn_VerifyEmail_color();"
+            onkeyup="PG_idcon_control_btn_VerifyEmail_color();"
+            {% if form.errors %}
+                aria-invalid="true"
+                aria-describedby="RecoverEmail-email-error"
+            {%- endif -%}
+          >
+        </div>
+
+        <div class="myaccount__authenticate-step1-submit-button">
+          <div id="PG_btn_VerifyEmail" class="myaccount__authenticate-submit-text">メールアドレスを送信する</div>
+        </div>
+
+        <div class="cancel-email-verify">
+          <a href="/account/logout">メールアドレス認証を取り消す</a>
+        </div>
+
+        <div class="myaccount__authenticate-step1-caution-content">
+          <div class="myaccount__authenticate-step1-caution-text step1-caution-upper-text">
+            メールが届かない場合、以下のケースが発生している可能性があります。
+          </div>
+          <ul class="myaccount__authenticate-step1-caution-text step1-caution-middle-content">
+            <li class="step1-caution-middle-text">メールアドレスが停止/無効状態になっている</li>
+            <li class="step1-caution-middle-text">no-reply@moala.fun からメールを受け取れる設定になっていない</li>
+            <li class="step1-caution-middle-text">メールアドレスが停止/無効状態になっている</li>
+          </ul>
+          <div class="myaccount__authenticate-step1-caution-text step1-caution-bottom-text">
+            解決できない場合、別のメールアドレスで再度お試しください。
+            <br>
+            送信ボタンは60秒後に再度タップできるようになります。
+          </div>
+        </div>
+
+        <script>
+        var PG_idcon_customer_id = {{ customer.id }};
+        PG_idcon_control_btn_VerifyEmail_color();
+        </script>
+        <!--// PG STEP 1 END //-->
+
+        <!--// PG STEP 2 START //-->
+        <div class="myaccount__authenticate-step2-title">
+          Step. 2
+        </div>
+
+        <div class="myaccount__authenticate-step2-text">
+          メールに届いたコード（６ケタの数字）を入力してください。 コードを送信したらメール認証が完了いたします。
+        </div>
+
+        <div class="myaccount__authenticate-step2-label">
+          コード
+        </div>
+
+        <div id="PG_VerifyCode_error"></div>
+
+        <div class="myaccount__authenticate-step2-input-container">
+          <input
+            type="email"
+            style="height: 56px;width: 100%;"
+            value=""
+            name="code"
+            id="VerifyCode"
+            class="input-full{% if form.errors %} input--error{% endif %}"
+            autocorrect="off"
+            autocapitalize="off"
+            onchange="PG_idcon_control_btn_VerifyCode_color();"
+            onkeyup="PG_idcon_control_btn_VerifyCode_color();"
+            {% if form.errors %}
+                aria-invalid="true"
+                aria-describedby="RecoverEmail-email-error"
+            {%- endif -%}
+          >
+        </div>
+
+        <div class="myaccount__authenticate-step2-submit-button">
+          <div id="PG_btn_VerifyCode" class="myaccount__authenticate-submit-text">コードを送信する</div>
+        </div>
+
+        <script>
+          PG_idcon_control_btn_VerifyCode_color();
+        </script>
+        <!--// PG STEP 2 END //-->
+
+      </div>
+
+      <div id="PG_idcon_verify_success_section" class="not-display-page myaccount__finished-authenticate-wrapper">
+
+        <div id="PG_idcon_authsite_image" class="myaccount__finished-authenticate-icon"></div>
+
+        <div class="myaccount__finished_authenticate_messages">
+          メールアドレス認証が完了しました。<br>
+          認証されたメールアドレスで当サイトをご利用いただけます。 <br>
+          画面は自動で切り替わります。
+        </div>
+      </div>
+    {%- endif -%}
   </div>
 </div>
+
+{%- if settings.pg_use_subscription -%}
+  {% render 'huckleberry-subscription-customer-portal' %}
+{%- endif -%}

@@ -1,284 +1,658 @@
-{{ 'customer.css' | asset_url | stylesheet_tag }}
+{{ 'order.scss' | asset_url | stylesheet_tag }}
 
-<div class="customer order">
-  <svg style="display:none">
-    <symbol id="icon-discount" viewBox="0 0 12 12">
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M7 0h3a2 2 0 012 2v3a1 1 0 01-.3.7l-6 6a1 1 0 01-1.4 0l-4-4a1 1 0 010-1.4l6-6A1 1 0 017 0zm2 2a1 1 0 102 0 1 1 0 00-2 0z" fill="currentColor">
-    </symbol>
-  </svg>
-  <div>
-    <h1>{{ 'customer.account.title' | t }}</h1>
-    <a href="{{ routes.account_url }}">{{ 'customer.account.return' | t }}</a>
+<!--// 古いライブコマース、いずれ削除予定 //-->
+{%- assign cached_book_url = '' -%}
+{%- assign field_cnt = "3" -%}
+<!--// 古いライブコマース、いずれ削除予定 //-->
+
+<!--// PG LIVE COMMERCE V2 START //-->
+<script>
+var PG_lcg = {};
+</script>
+<!--// PG LIVE COMMERCE V2 END //-->
+
+
+<div id="PG_refund_area" class="order-refund-area"></div>
+<div class="page-width dissmiss_for_refund order-page-witdth">
+  <div class="section-header text-center myaccount__order-wrapper-margin">
+    <!--// PG TITLE START //-->
+    <h1 class="myaccount__order-history-head-title">注文詳細</h1>
+    <!--// PG TITLE END //-->
   </div>
 
-  <div>
-    <div>
-      <h2>{{ 'customer.order.title' | t: name: order.name }}</h2>
-      {%- assign order_date = order.created_at | time_tag: format: "date_at_time" -%}
-      <p>{{ 'customer.order.date_html' | t: date: order_date }}</p>
-      {%- if order.cancelled -%}
-        {%- assign cancelled_at = order.cancelled_at | time_tag: format: "date_at_time" -%}
-        <p>{{ 'customer.order.cancelled_html' | t: date: cancelled_at }}</p>
-        <p>{{ 'customer.order.cancelled_reason' | t: reason: order.cancel_reason_label }}</p>
-      {%- endif -%}
+  <div class="grid myaccount">
+    <div class="grid__item myaccount__order-history">
+      <!--// PG REFUND META START //-->
+      {%- assign metafields_for_refund = order.metafields.order_refund -%}
+      <div class="order-hidden-metafields-value">{{ metafields_for_refund }}</div>
+      {%- assign refund_date = metafields_for_refund['date'] -%}
+      <!--// PG REFUND META END //-->
 
-      <table role="table" class="order-details">
-        <caption class="visually-hidden">{{ 'customer.order.title' | t: name: order.name }}</caption>
-        <thead role="rowgroup">
-          <tr role="row">
-            <th id="ColumnProduct" scope="col" role="columnheader">{{ 'customer.order.product' | t }}</th>
-            <th id="ColumnSku" scope="col" role="columnheader">{{ 'customer.order.sku' | t }}</th>
-            <th id="ColumnPrice" scope="col" role="columnheader">{{ 'customer.order.price' | t }}</th>
-            <th id="ColumnQuantity" scope="col" role="columnheader">{{ 'customer.order.quantity' | t }}</th>
-            <th id="ColumnTotal" scope="col" role="columnheader">{{ 'customer.order.total' | t }}</th>
+      <!--// PG ORDER NO. START //-->
+      <div class="order-number">{{ 'customer.order.title' | t: name: order.name | replace: "注文","注文番号" }}</div>
+      <!--// PG ORDER NO. END //-->
+
+      <!--// PG ORDER DATE START //-->
+      {%- assign order_date = order.created_at | time_tag: format: "date_at_time" -%}
+      <div class="order-date">{{ 'customer.order.date_html' | t: date: order_date }}</div>
+      <!--// PG ORDER DATE END //-->
+
+      <!--// PG SERIAL NUMBER META START //-->
+      {%- assign metafields_for_serial = order.metafields.order_serial_codes -%}
+      <div class="order-hidden-metafields-value">{{ metafields_for_serial }}</div>
+      {%- assign serial_codes = metafields_for_serial['serial_codes'] | replace: '\n', ' ' | split: ' ' -%}
+      <div class="order-hidden-metafields-value">{{ serial_codes }}</div>
+      <!--// PG SERIAL NUMBER META END //-->
+
+      <!--// PG ORDER REFUND BUTTON START //-->
+      {%- render 'pg_refund_button', refund_date: refund_date -%}
+      <!--// PG ORDER REFUND BUTTON END //-->
+
+      <!--// PG RESALE PRODUCT ID START //-->
+      {%- assign resale_product_ids = order.metafields.resale_status['resale_product_ids'] -%}
+      <!--// PG RESALE PRODUCT ID END //-->
+
+      <!--// PG REFUND DONE MESSAGE START //-->
+      <div id="PG_refund_thx_msg" class="myaccount__order-refund_thx_msg">払い戻しはお申し込み済みです。</div>
+      <!--// PG REFUND DONE MESSAGE END //-->
+
+      <!--// PG META START //-->
+      {%- assign metafields_for_book_url = order.metafields.order_book_urls -%}
+      {%- assign resale_book_urls_param = order.metafields.resale_book_urls -%}
+      <div class="order-hidden-metafields-value">{{ metafields_for_book_url }}<br>{{ resale_book_urls_param }}</div>
+      {%- assign normal_ticket_urls = metafields_for_book_url['book_url'] | append: resale_book_urls_param.book_url | split: ' ' -%}
+
+      <!--// PG REPEATABLE TICKET START //-->
+      {%- assign index_for_pre_book = 0 -%}
+      {%- assign ticket_type = "" -%}
+      {%- assign repeat_ticket_obj = "" | split: '@@@' -%}
+      {%- assign normal_ticket_obj = "" | split: '@@@' -%}
+      {%- for book_url_ele in normal_ticket_urls -%}
+        {%- if index_for_pre_book == 0 -%}
+          {%- if  book_url_ele contains "__" -%}
+            {%- assign ticket_type = "repeat_ticket" -%}
+            {%- assign splited_book_url_ele = book_url_ele | split: '@@@' -%}
+            {%- assign repeat_ticket_obj = repeat_ticket_obj | concat: splited_book_url_ele -%}
+            {%- assign index_for_pre_book = 1 -%}
+          {%-  else -%}
+            {%- assign ticket_type = "normal_ticket" -%}
+            {%- assign splited_book_url_ele = book_url_ele | split: '@@@' -%}
+            {%- assign normal_ticket_obj = normal_ticket_obj | concat: splited_book_url_ele -%}
+            {%- assign index_for_pre_book = 1 -%}
+          {%- endif -%}
+        {%- elsif index_for_pre_book == 1 -%}
+          {%- if ticket_type == "normal_ticket" -%}
+            {%- assign splited_book_url_ele = book_url_ele | split: '@@@' -%}
+            {%- assign normal_ticket_obj = normal_ticket_obj | concat: splited_book_url_ele -%}
+          {%-  elsif ticket_type == "repeat_ticket" -%}
+            {%- assign splited_book_url_ele = book_url_ele | split: '@@@' -%}
+            {%- assign repeat_ticket_obj = repeat_ticket_obj | concat: splited_book_url_ele -%}
+          {%- endif -%}
+          {%- assign index_for_pre_book = 2 -%}
+        {%- elsif index_for_pre_book == 2 -%}
+          {%- if ticket_type == "normal_ticket" -%}
+            {%- assign splited_book_url_ele = book_url_ele | split: '@@@' -%}
+            {%- assign normal_ticket_obj = normal_ticket_obj | concat: splited_book_url_ele -%}
+          {%-  elsif ticket_type == "repeat_ticket" -%}
+            {%- assign splited_book_url_ele = book_url_ele | split: '@@@' -%}
+            {%- assign repeat_ticket_obj = repeat_ticket_obj | concat: splited_book_url_ele -%}
+          {%- endif -%}
+          {%- assign index_for_pre_book = 0 -%}
+        {%-  endif -%}
+      {%- endfor -%}
+      {%- assign normal_ticket_urls = normal_ticket_obj -%}
+      <!--// PG REPEATABLE TICKET END //-->
+      <!--// PG META END //-->
+
+      <table class="order-table" style="border: none; margin-bottom: 46px;">
+        <!--// PG THEAD START //-->
+        <thead class="order-table-head">
+          <tr>
+            <th scope="col" class="">{{ 'customer.order.product' | t }}</th>
+            <th scope="col">{{ 'customer.order.sku' | t }}</th>
+            <th class="text-right" scope="col">{{ 'customer.order.price' | t }}</th>
+            <th class="text-right" scope="col">{{ 'customer.order.quantity' | t }}</th>
           </tr>
         </thead>
-        <tbody role="rowgroup">
-          {%- for line_item in order.line_items -%}
-            <tr role="row">
-              <td
-                id="Row{{ line_item.key }}"
-                headers="ColumnProduct"
-                role="rowheader"
-                scope="row"
-                data-label="{{ 'customer.order.product' | t }}"
-              >
-                <div>
-                  {%- if line_item.url != blank -%}
-                    <a href="{{ line_item.url }}">{{ line_item.title }}</a>
-                  {%- else -%}
-                    <p>{{ line_item.title }}</p>
-                  {%- endif -%}
-                  {%- assign property_size = line_item.properties | size -%}
-                  {%- unless line_item.selling_plan_allocation == nil and property_size == 0 -%}
-                    <div class="properties">
-                      {%- unless line_item.product.has_only_default_variant -%}
-                        <span>
-                          {{ line_item.variant.title }}
-                        </span>
-                      {%- endunless -%}
-                      {%- unless line_item.selling_plan_allocation == nil -%}
-                        <span>
-                          {{ line_item.selling_plan_allocation.selling_plan.name }}
-                        </span>
-                      {%- endunless -%}
-                      {%- if property_size != 0 -%}
-                        {%- for property in line_item.properties -%}
-                          {% assign property_first_char = property.first | slice: 0 %}
-                          {%- if property.last != blank and property_first_char != '_' -%}
-                            <span>
-                              {{ property.first }}:&nbsp;
-                              {%- if property.last contains '/uploads/' -%}
-                                <a href="{{ property.last }}">{{ property.last | split: '/' | last }}</a>
-                              {%- else -%}
-                                {{ property.last }}
-                              {%- endif -%}
-                            </span>
-                          {%- endif -%}
-                        {%- endfor -%}
-                      {%- endif -%}
-                    </div>
-                  {%- endunless -%}
+        <!--// PG THEAD END //-->
 
+        <!--// PG TBODY START //-->
+        <tbody class="order-table-body">
+
+        {% assign sorted = order.line_items | sort: "title" %} <!--// PG //-->
+          {%- for line_item in sorted -%} <!--// PG //-->
+            <tr id="{{ line_item.key }}" class="top-table-row">
+              <th class="order-table__product" scope="row" data-label="">
+
+                <table class="order-table-product-container">
+
+                <tr class="order-table-border-style-none">
+                <td class="order-table-border-style-none">
+                <div class="order-resale-wrapper">
+                  {%- assign splited_resale_product_ids = resale_product_ids | split: ',' -%}
+                  {%- for resale_product_id in splited_resale_product_ids -%}
+                    {%- assign int_resale_product_id = resale_product_id | plus: 0 -%}
+                    {%- if int_resale_product_id == line_item.product_id -%}
+                      <div class="order-resale-status-tag-content">
+                        <div class="order-resale-status-tag">出品したチケット</div>
+                      </div>
+                      {%- break -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  <!--// PG PRODUCT TITLE START //-->
+                  <a href="{{ line_item.product.url }}">
+                    <text class="myaccount__order-product-title">
+                      {{ line_item.title }}
+                      {%- if line_item.product.has_only_default_variant != true -%}
+                        <br>{{ line_item.variant.title }}
+                      {%- endif -%}
+                    </text>
+                  </a>
+
+                  {%- for resale_product_id in splited_resale_product_ids -%}
+                    {%- assign int_resale_product_id = resale_product_id | plus: 0 -%}
+                    {%- if int_resale_product_id == line_item.product_id -%}
+                      <div class="order-resale-caution-notification">
+                        <div>出品したチケットのリセール状況はチケットを開いて確認ください</div>
+                      </div>
+                      {%- break -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+
+                  <!--// PG PRODUCT TITLE END //-->
+
+                  <!--// PG DISCOUNT START //-->
                   {%- if line_item.line_level_discount_allocations != blank -%}
-                    <ul role="list" aria-label="{{ 'customer.order.discount' | t }}">
+                    <ul class="order-discount order-discount--list order-discount--title" aria-label="{{ 'customer.order.discount' | t }}">
                       {%- for discount_allocation in line_item.line_level_discount_allocations -%}
-                        <li>
-                          <svg aria-hidden="true" focusable="false" viewBox="0 0 12 12">
-                            <use href="#icon-discount" />
-                          </svg>
-                          {{- discount_allocation.discount_application.title }} (-{{ discount_allocation.amount | money -}})
+                        <li class="order-discount__item">
+                          {%- include 'icon-saletag' -%}{{ discount_allocation.discount_application.title }} (-{{ discount_allocation.amount | money }})
                         </li>
                       {%- endfor -%}
                     </ul>
                   {%- endif -%}
+                  <!--// PG DISCOUNT END //-->
 
-                  {%- if line_item.fulfillment -%}
-                    <div class="fulfillment">
-                      {%- assign created_at = line_item.fulfillment.created_at | time_tag: format: 'date' -%}
-                      <span>{{ 'customer.order.fulfilled_at_html' | t: date: created_at }}</span>
-
-                        {%- if line_item.fulfillment.tracking_url -%}
-                          <a href="{{ line_item.fulfillment.tracking_url }}">
-                            {{ 'customer.order.track_shipment' | t }}
-                          </a>
-                        {%- endif -%}
-                        <span>
-                          {{ line_item.fulfillment.tracking_company }}
-                          {%- if line_item.fulfillment.tracking_number -%} #{{ line_item.fulfillment.tracking_number }} {%- endif -%}
-                        </span>
-                    </div>
-                  {%- endif -%}
                 </div>
-              </td>
-              <td
-                headers="Row{{ line_item.key }} ColumnSku"
-                role="cell"
-                data-label="{{ 'customer.order.sku' | t }}"
-              >
+                </td>
+                </tr>
+                <tr class="order-table-border-style-none"><td id="stream_{{line_item.variant_id}}" class="order-table-data">
+
+                  <!--// 古いライブコマース、いずれ削除予定 //-->
+                  {%- assign can_use_live_commerce = false -%}
+                  {%- for product_tag in line_item.product.tags -%}
+                    {%- if product_tag contains "lcs:yes" -%}
+                      {%- assign can_use_live_commerce = true -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  {%- if can_use_live_commerce -%}
+                    {%- assign this_lcg_index = 0 -%}
+                    {%- comment -%} 10000以降は取得できないので注意 {%- endcomment -%}
+                    {%- paginate collections.all.products by 9999 -%}
+                    {%- for product in collections.all.products -%}
+                      {%- for item_tag in product.tags  -%}
+                        {%- assign tagged_product_id = "" -%}
+                        {%- if item_tag contains "lcg:" -%}
+                          {%- assign tagged_product_id = item_tag | replace: "lcg:", "" -%}
+                        {%- endif -%}
+                        {%- assign tagged_product_id = tagged_product_id | plus: 0 -%}
+                        {%- if line_item.product.id == tagged_product_id -%}
+                          {%- capture strli -%}
+                          <li class="live_commerce_goods_ele live-commerce-product">
+                            <input value="{{ tagged_product_id }}" type="hidden">
+                            {% include 'pg_product-card-for-live-commerce-old',product: product %}
+                          </li>
+                          {%- endcapture -%}
+                          <script>
+                          if(typeof PG_lcg["{{ line_item.product.id }}"] == "undefined") {
+                            PG_lcg["{{ line_item.product.id }}"] = {};
+                          }
+                          PG_lcg["{{ line_item.product.id }}"][{{ this_lcg_index }}] = `{{ strli }}`;
+                          </script>
+                          {%- assign this_lcg_index = this_lcg_index | plus: 1 -%}
+                        {%- endif -%}
+                      {%- endfor  -%}
+                    {%- endfor -%}
+                    {%- endpaginate -%}
+                  {%- endif -%}
+                  <!--// 古いライブコマース、いずれ削除予定 //-->
+
+                <!--// PG MT JUDGE START //-->
+                <!--// NOTE: 通常のチケット表示か、回数券表示か判別している //-->
+                {%- assign display_normal_tickets = false -%}
+                {%- assign index_for_judge = 0 -%}
+                {%- for id in normal_ticket_urls -%}
+                  {%- if index_for_judge == 0 -%}
+                    {%- assign product_id = id | plus: 0 -%}
+                    {%- assign index_for_judge = 1 -%}
+                    {%- if product_id == line_item.product.id -%}
+                      {%- assign display_normal_tickets = true -%}
+                      {%- break -%}
+                    {%- endif -%}
+                  {%- elsif index_for_judge == 1 -%}
+                    {%- assign index_for_judge = 2 -%}
+                  {%- elsif index_for_judge == 2 -%}
+                    {%- assign index_for_judge = 0 -%}
+                  {%- endif -%}
+                {%- endfor -%}
+
+                {%- comment -%}購入済み商品が誤って削除されてしまったときの復旧処理{%- endcomment -%}
+                {%- if line_item.product_id == blank -%}
+                  {%- assign display_normal_tickets = true -%}
+                  {%- assign order_ids = '' -%}
+                  {%- comment -%}metafieldsの値から購入した商品のproduct_idを取り出す{%- endcomment -%}
+                  {%- for ticket_url_ele in normal_ticket_urls -%}
+                    {%- assign for_loop_index = forloop.index | modulo: 3 -%}
+                    {%- if for_loop_index == 1 -%}
+                      {%- assign order_ids = order_ids | append: ticket_url_ele | append: ',' -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  {%- comment -%}metafieldsから取り出したproduct_idと注文商品のproduct_idを突き合わせる{%- endcomment -%}
+                  {%- for line_item_ele in order.line_items -%}
+                    {%- assign order_ids = order_ids | remove_first: line_item_ele.product_id -%}
+                  {%- endfor -%}
+                  {%- assign order_ids = order_ids | remove: ',' -%}
+                  {%- comment -%}後の処理で、intで比較したいので、plus: 0 でintに変換しています{%- endcomment -%}
+                  {%- assign deleted_product_id = order_ids | plus: 0 -%}
+                {%- endif -%}
+                <!--// PG MT JUDGE END //-->
+
+                <!--// NOTE: チケット自体を表示するかどうかを display_ticketsの値で判別する //-->
+                {%- assign display_tickets = false -%}
+                {%- if display_normal_tickets == true -%}
+                  <!--// PG MT SHOW START //-->
+                  {%- assign index_for_display_tickets = 0 -%}
+                  {%- for ticket_url_ele in normal_ticket_urls -%}
+                    {%- if index_for_display_tickets == 0 -%}
+                      {%- assign product_id = ticket_url_ele | plus: 0 -%}
+                      {%- if product_id == line_item.product.id -%}
+                        {%- assign index_for_display_tickets = 1 -%}
+                      {%- endif -%}
+
+                      {%- comment -%}購入済み商品が誤って削除されてしまったときの復旧処理{%- endcomment -%}
+                      {%- if line_item.product_id == blank and product_id == deleted_product_id -%}
+                        {%- assign index_for_display_tickets = 1 -%}
+                      {%- endif -%}
+                    {%- elsif index_for_display_tickets == 1 -%}
+                      {%- assign index_for_display_tickets = 2 -%}
+                    {%- elsif index_for_display_tickets == 2 -%}
+                      {%- if cached_book_url != ticket_url_ele -%}
+                        <div class="order-mt-box order-ticket-wrapper">
+                          <div class="order-mt-info order-ticket-content">
+                            <!--// PG TICKET VARIANTS MAKE_STRING START //-->
+                            {%- for vari_line_item in sorted -%}
+                              {%- if line_item.product_id == vari_line_item.product_id -%}
+                                {{ vari_line_item.variant.title }}　{{ vari_line_item.quantity }}枚<br>
+                              {%- endif -%}
+                            {%- endfor -%}
+                            <!--// PG TICKET VARIANTS MAKE_STRING START //-->
+                          </div>
+                          <div class="order-mt-link order-ticket-display-container">
+                            <a href="{{ ticket_url_ele }}" target="_blank" class="border-none">
+                              <div class="order-mt-button order-ticket-display-button">
+                                チケットを開く
+                              </div>
+                            </a>
+                          </div>
+                        </div>
+                        {%- assign display_tickets = true -%}
+                      {%- endif -%}
+                      {%- assign cached_book_url = ticket_url_ele -%}
+                      {%- assign index_for_display_tickets = 3 -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  <!--// PG MT SHOW END //-->
+                {%- endif -%}
+
+                <!--// PG REPEAT TICKET JUDGE START //-->
+                {% comment %}NOTE: 回数券を表示するかどうかをここで判別します{% endcomment %}
+                {%- assign show_repeat_ticket = false -%}
+                {%- assign index_for_judge_repeat = 0 -%}
+                {%- for id in repeat_ticket_obj -%}
+                  {%- if index_for_judge_repeat == 0 -%}
+                    {%- assign ids = id | split: "__" -%}
+                    {%- assign pid = ids[0] | plus: 0 -%}
+                    {%- assign index_for_judge_repeat = 1 -%}
+                    {%- if pid == line_item.product.id -%}
+                      {%- assign show_repeat_ticket = true -%}
+                      {%- break -%}
+                    {%- endif -%}
+                  {%- else -%}
+                    {%- assign index_for_judge_repeat = index_for_judge_repeat | plus: 1 | modulo: 3 -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                <!--// PG REPEAT TICKET JUDGE END //-->
+                {%- if show_repeat_ticket == true -%}
+                  <div>
+                    {%- if settings.pg_primary_repeatable_ticket_text != "-" -%}
+                      <div class="repeatable-ticket-note">
+                        <div>{{ settings.pg_primary_repeatable_ticket_text }}</div>
+                      </div>
+                    {%- endif -%}
+                    <div class="repeatable-tickets-wrapper">
+                      <div class="repeatable-ticket-title">
+                        <div>{{ line_item.title }}</div>
+                      </div>
+                      {%- assign index_for_show_repeat = 0 -%}
+                      {%- assign t_card_index = 1 -%}
+                      {%- for repeat_ticket_ele in repeat_ticket_obj -%}
+                        {%- if index_for_show_repeat == 0 -%}
+                          {%- for id in repeat_ticket_obj -%}
+                            {%- assign ids = repeat_ticket_ele | split: "__" -%}
+                            {%- assign rt_product_id = ids[0] | plus: 0 -%}
+                            {%- assign rt_vari_index = 0 -%}
+                            {%- for id in ids -%}
+                              {%- if rt_vari_index == 0 -%}
+                                {%- assign rt_vari_index = 1 -%}
+                              {%- elsif rt_vari_index == 1 -%}
+                                <!--// PG GET VARIANT ID FROM META START //-->
+                                {%- assign rt_variant_id = id | plus: 0 -%}
+                                <!--// PG GET VARIANT ID FROM META END //-->
+                              {%- endif -%}
+                            {%- endfor -%}
+                            {%- if rt_product_id == line_item.product.id and line_item.variant.id == rt_variant_id -%}
+                              {%- assign index_for_show_repeat = 1 -%}
+                            {%- endif -%}
+                          {%- endfor -%}
+                        {%- elsif index_for_show_repeat == 1 -%}
+                          {%- assign index_for_show_repeat = 2 -%}
+                        {%- elsif index_for_show_repeat == 2 -%}
+                          {%- assign index_for_show_repeat = 0 -%}
+                          {%- assign repeat_ticket_url = repeat_ticket_ele -%}
+                          <div class="repeatable-ticket-container">
+                            <div class="repeatable-ticket-content-area">
+                              <!--// NOTE: Liquidで動的にチケットボタン表示領域のスタイルを調整しています //-->
+                              {%- assign card_right_margin = 16 -%}
+                              {%- if t_card_index > 9 -%}
+                                {%- assign card_right_margin = 7 -%}
+                              {%- endif -%}
+                              <div class="repeatable-ticket-content-index" style="margin-right: {{ card_right_margin }}px;">
+                                <div>{{ t_card_index }}</div>
+                              </div>
+                              <div class="repeatable-ticket-content">
+                                <div class="repeatable-ticket-content-head">
+                                  <div class="repeatable-ticket-content-title">
+                                    <div class="repeatable-ticket-text">{{ line_item.variant.title }}</div>
+                                  </div>
+                                  <div class="repeatable-ticket-icon">
+                                    {%- include 'pg_icon-ticket' -%}
+                                    <!--// PG GET TICKET COUNT START //-->
+                                    {%- for ticket_count in line_item.product.tags -%}
+                                      {%- if ticket_count contains "rtc:" -%}
+                                        {%- assign ticket_count = ticket_count | replace: "rtc:", "" -%}
+                                        {%- break -%}
+                                      {%- endif -%}
+                                    {%- endfor -%}
+                                    <div class="repeatable-ticket-count">{{ ticket_count }}</div>
+                                    <!--// PG GET TICKET COUNT END //-->
+                                  </div>
+                                </div>
+                                <div>
+                                  <a href="{{ repeat_ticket_url }}" target="_blank" class="repeatable-ticket-link">
+                                    <div class="repeatable-ticket-button-content">{{ settings.pg_primary_repeatable_ticket_button_text }}</div>
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          {%- assign t_card_index = t_card_index | plus: 1 -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                      {%- assign ticket_count = "" -%}
+                    </div>
+                  </div>
+                {%- endif -%}
+
+                <!--// PG CAUTION START //-->
+                {%- if display_tickets -%}
+                  <div class="order-mt-caution order-ticket-caution">
+                    {{ settings.pg_customers_order_qtcaution | newline_to_br }}
+                  </div>
+                {%- endif-%}
+                <!--// PG CAUTION END //-->
+
+                <!--// PG SERIAL NUMBER START //-->
+                {%- if display_normal_tickets == false and show_repeat_ticket == false -%}
+                  {%- include 'pg_serial' -%}
+                {%- endif -%}
+                <!--// PG SERIAL NUMBER END //-->
+
+                    </td>
+                  </tr>
+                </table>
+
+              </th>
+
+              <!--// PG SKU START //-->
+              {%- assign line_item_product = line_item.product -%}
+              <td class="order-line-item-sku" data-label="{%- if line_item_product.type == "primary" or line_item_product.type == "secondary" or line_item_product.type == "primary_live_streaming" or line_item_product.type == "primary_streaming" or line_item_product.type == "subscription" -%}{%- elsif line_item_product.type == "goods" -%}{{ 'customer.order.sku' | t }}{%- endif -%}">
                 {{ line_item.sku }}
               </td>
-              <td
-                headers="Row{{ line_item.key }} ColumnPrice"
-                role="cell"
-                data-label="{{ 'customer.order.price' | t }}"
-              >
-                {%- if line_item.original_price != line_item.final_price or line_item.unit_price_measurement -%}
-                  <dl>
-                    {%- if line_item.original_price != line_item.final_price -%}
-                      <dt>
-                        <span class="visually-hidden">{{ 'products.product.price.regular_price' | t }}</span>
-                      </dt>
-                      <dd class="regular-price">
-                        <s>{{ line_item.original_price | money }}</s>
-                      </dd>
-                      <dt>
-                        <span class="visually-hidden">{{ 'products.product.price.sale_price' | t }}</span>
-                      </dt>
-                      <dd>
-                        <span>{{ line_item.final_price | money }}</span>
-                      </dd>
-                    {%- else -%}
-                      <dt>
-                        <span class="visually-hidden">{{ 'products.product.price.regular_price' | t }}</span>
-                      </dt>
-                      <dd>
-                        {{ line_item.original_price | money }}
-                      </dd>
-                    {%- endif -%}
-                    {%- if line_item.unit_price_measurement -%}
-                      <dt>
-                        <span class="visually-hidden">{{ 'products.product.price.unit_price' | t }}</span>
-                      </dt>
-                      <dd class="unit-price">
-                        <span>
-                          {%- capture unit_price_separator -%}
-                            <span aria-hidden="true">/</span><span class="visually-hidden">{{ 'accessibility.unit_price_separator' | t }}&nbsp;</span>
-                          {%- endcapture -%}
-                          {%- capture unit_price_base_unit -%}
-                            {%- if line_item.unit_price_measurement.reference_value != 1 -%}
-                              {{- line_item.unit_price_measurement.reference_value -}}
-                            {%- endif -%}
-                            {{ line_item.unit_price_measurement.reference_unit }}
-                          {%- endcapture -%}
-                          <span data-unit-price>{{ line_item.unit_price | money }}</span>{{- unit_price_separator -}}{{- unit_price_base_unit -}}
-                        </span>
-                      </dd>
-                    {%- endif -%}
-                  </dl>
-                {%- else -%}
-                  <span>{{ line_item.final_price | money }}</span>
-                {%- endif -%}
-              </td>
-              <td
-                headers="Row{{ line_item.key }} ColumnQuantity"
-                role="cell"
-                data-label="{{ 'customer.order.quantity' | t }}"
-              >
-                {{ line_item.quantity }}
-              </td>
-              <td
-                headers="Row{{ line_item.key }} ColumnTotal"
-                role="cell"
-                data-label="{{ 'customer.order.total' | t }}"
-              >
-                {%- if line_item.original_line_price != line_item.final_line_price -%}
-                  <dl>
+              <!--// PG SKU END //-->
+
+              <!--// PG ORDER PRICE START //-->
+              <td class="text-right order-item-price-wrapper" data-label="{{ 'customer.order.price' | t }}">
+                <dl class="order-item-price-container">
+                  {%- if line_item.original_price != line_item.final_price -%}
                     <dt>
-                      <span class="visually-hidden">{{ 'products.product.price.regular_price' | t }}</span>
-                    </dt>
-                    <dd class="regular-price">
-                      <s>{{ line_item.original_line_price | money }}</s>
-                    </dd>
-                    <dt>
-                      <span class="visually-hidden">{{ 'products.product.price.sale_price' | t }}</span>
+                      <span class="visually-hidden">{{ 'products.product.regular_price' | t }}</span>
                     </dt>
                     <dd>
-                      <span>{{ line_item.final_line_price | money }}</span>
+                      <s>{{ line_item.original_price | money }}</s>
                     </dd>
-                  </dl>
-                {%- else -%}
-                  {{ line_item.original_line_price | money }}
-                {%- endif -%}
+                    <dt>
+                      <span class="visually-hidden">{{ 'products.product.sale_price' | t }}</span>
+                    </dt>
+                    <dd>
+                      <span class="order-discount">{{ line_item.final_price | money }}</span>
+                    </dd>
+                  {%- else -%}
+                    <dt>
+                      <span class="visually-hidden">{{ 'products.product.regular_price' | t }}</span>
+                    </dt>
+                    <dd>
+                      {{ line_item.original_price | money }}
+                    </dd>
+                  {%- endif -%}
+
+                  {%- if line_item.unit_price_measurement -%}
+                    <dt>
+                      <span class="visually-hidden visually-hidden--inline">{{ 'products.product.unit_price_label' | t }}</span>
+                    </dt>
+                    <dd>
+                      <span class="price-unit-price">
+                        {%- capture unit_price_separator -%}
+                          <span aria-hidden="true">/</span><span class="visually-hidden">{{ 'general.accessibility.unit_price_separator' | t }}&nbsp;</span>
+                        {%- endcapture -%}
+                        {%- capture unit_price_base_unit -%}
+                          {%- if line_item.unit_price_measurement.reference_value != 1 -%}
+                            {{- line_item.unit_price_measurement.reference_value -}}
+                          {%- endif -%}
+                          {{ line_item.unit_price_measurement.reference_unit }}
+                        {%- endcapture -%}
+
+                        <span data-unit-price>{{ line_item.unit_price | money }}</span>{{- unit_price_separator -}}{{- unit_price_base_unit -}}
+                      </span>
+                    </dd>
+                  {%- endif -%}
+                </dl>
               </td>
+              <!--// PG ORDER PRICE END //-->
+
+              <!--// PG ORDER QUANTITY START //-->
+              <td class="text-right order-quantity" data-label="{{ 'customer.order.quantity' | t }}">{{ line_item.quantity }}</td>
+              <!--// PG ORDER QUANTITY END //-->
             </tr>
           {%- endfor -%}
         </tbody>
-        <tfoot role="rowgroup">
-          <tr role="row">
-            <td id="RowSubtotal" role="rowheader" scope="row" colspan="4">
-              {{ 'customer.order.subtotal' | t }}
+        <!--// PG TBODY END //-->
+        <!--// PG TFOOT START //-->
+        <tfoot>
+          <tr>
+            <th class="small--hide order-bold-text" scope="row" colspan="{{ field_cnt }}">
+              {{ 'customer.order.subtotal' | t }} (税込)
+            </th>
+            <td class="text-right" data-label="{{ 'customer.order.subtotal' | t }} (税込)">
+              <div class="order-subtotal-price">
+                {{ order.line_items_subtotal_price | money }}
+              </div>
             </td>
-            <td headers="RowSubtotal" role="cell" data-label="{{ 'customer.order.subtotal' | t }}">{{ order.line_items_subtotal_price | money }}</td>
           </tr>
+
           {%- if order.cart_level_discount_applications != blank -%}
-            <tr role="row">
+            <tr>
               {%- for discount_application in order.cart_level_discount_applications -%}
-                <td id="RowDiscount" role="rowheader" scope="row" colspan="4">
+                <th class="small--hide" scope="row" colspan="{{ field_cnt }}">
                   {{ 'customer.order.discount' | t }}
-                  <span class="cart-discount">
-                    <svg aria-hidden="true" focusable="false" viewBox="0 0 12 12">
-                      <use href="#icon-discount" />
-                    </svg>
-                    {{- discount_application.title -}}
+                  <span class="order-discount order-discount--title">
+                    {%- include 'icon-saletag' -%}{{- discount_application.title -}}
                   </span>
-                </td>
-                <td headers="RowDiscount" role="cell" data-label="{{ 'customer.order.discount' | t }}">
-                  <div>
-                    <span>-{{ discount_application.total_allocated_amount | money }}</span>
-                    <span class="cart-discount">
-                      <svg aria-hidden="true" focusable="false" viewBox="0 0 12 12">
-                        <use href="#icon-discount" />
-                      </svg>
-                      {{- discount_application.title -}}
+                </th>
+                <td class="text-right" data-label="{{ 'customer.order.discount' | t }}">
+                  <div class="order-discount-wrapper">
+                    <span class="order-discount order-discount--title text-left medium-up--hide">
+                      {%- include 'icon-saletag' -%}{{- discount_application.title -}}
                     </span>
+                    <span class="order-discount">-{{ discount_application.total_allocated_amount | money }}</span>
                   </div>
                 </td>
               {%- endfor -%}
             </tr>
           {%- endif -%}
+
           {%- for shipping_method in order.shipping_methods -%}
-            <tr role="row">
-              <td id="RowShipping" role="rowheader" scope="row" colspan="4">{{ 'customer.order.shipping' | t }} ({{ shipping_method.title }})</td>
-              <td headers="RowShipping" role="cell" data-label="{{ 'customer.order.shipping' | t }} ({{ shipping_method.title }})">{{ shipping_method.price | money }}</td>
+            <tr>
+              <th class="small--hide order-bold-text" scope="row" colspan="{{ field_cnt }}">
+                {{ shipping_method.title }} (税込)
+              </th>
+              <td class="text-right order-bold-text" data-label="{{ shipping_method.title }} (税込)">
+                <div class="order-method-price">
+                  {{ shipping_method.price | money }}
+                </div>
+              </td>
             </tr>
           {%- endfor -%}
-          {%- for tax_line in order.tax_lines -%}
-            <tr role="row">
-              <td id="RowTax" role="rowheader" scope="row" colspan="4">{{ 'customer.order.tax' | t }} ({{ tax_line.title }} {{ tax_line.rate | times: 100 }}%)</td>
-              <td headers="RowTax" role="cell" data-label="{{ 'customer.order.tax' | t }} ({{ tax_line.title }} {{ tax_line.rate | times: 100 }}%)">{{ tax_line.price | money }}</td>
-            </tr>
-          {%- endfor -%}
-          {%- if order.total_duties -%}
-            <tr role="row">
-              <td id="RowDuties" role="rowheader" scope="row" colspan="4">{{ 'customer.order.total_duties' | t }}</td>
-              <td headers="RowDuties" role="cell" data-label="{{ 'customer.order.total_duties' | t }}">{{ order.total_duties | money }}</td>
-            </tr>
-          {%- endif -%}
-          <tr role="row">
-            <td id="RowTotal" role="rowheader" scope="row" colspan="3">{{ 'customer.order.total' | t }}</td>
-            <td headers="RowTotal" role="cell" colspan="2" data-label="{{ 'customer.order.total' | t }}">{{ order.total_price | money_with_currency }}</td>
+
+          <tr class="order-total-price-row">
+            <th class="small--hide order-bold-text" scope="row" colspan="{{ field_cnt }}">
+              {{ 'customer.order.total' | t }} (税込)
+            </th>
+            <td class="text-right order-total-price-wrapper" data-label="{{ 'customer.order.total' | t }} (税込)">
+              <div class="order-total-price">
+                {{ order.total_price | money }}
+              </div>
+            </td>
           </tr>
         </tfoot>
+        <!--// PG TFOOT END //-->
       </table>
     </div>
-    <div>
-      <div>
-        <h2>{{ 'customer.order.billing_address' | t }}</h2>
-        <p>
-          <strong>{{ 'customer.order.payment_status' | t }}:</strong>
+
+    <!--// PG ORDER CART MEMO START //-->
+    {%- if settings.pg_order_cart_memo -%}
+      {%- if order.note != blank -%}
+        <div class="grid__item myaccount__cart-memo">
+          <div class="cart-memo-wrapper">
+            <p class="cart-memo--title">{{ settings.pg_order_cart_memo_text }}</p>
+            <div class="cart-memo--text">{{ order.note }}</div>
+          </div>
+        </div>
+      {%- endif -%}
+    {%- endif -%}
+    <!--// PG ORDER CART MEMO END //-->
+
+    <!--// PG ORDER ADDRESS START //-->
+    <div class="grid__item myaccount__account-details order-billing-address-container">
+      <h3 class="order-billing-address-title">
+        {{ 'customer.order.billing_address' | t }}
+      </h3>
+
+      {{ order.billing_address | format_address | replace: "<p>","<p class='address-text'>" }}
+
+      <p class="order-payment-status">
+        <text>
+          {{ 'customer.order.payment_status' | t }}:
+        </text>
+        {%- if settings.pg_order_refund -%}
+          {%- if order.financial_status == 'paid' and order.cancelled -%}
+            {%- for item in order.line_items -%}
+              {%- for tag in item.product.tags -%}
+                {%- assign refund_tag = tag | split: ":" -%}
+                {%- if refund_tag.size > 1 and refund_tag[0] == "refund" -%}
+                  {%- assign refund_flag = refund_tag[1] -%}
+                  {%- break -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {%- endfor -%}
+            {%- if refund_flag == "yes" -%}
+              {%- if refund_date == blank -%}
+                払い戻し申込み
+              {%- else -%}
+                払い戻し申込み済
+              {%- endif -%}
+            {%- else -%}
+              {{ order.financial_status_label }}
+            {%-endif-%}
+          {%- else -%}
+            {{ order.financial_status_label }}
+          {%- endif -%}
+        {%- else -%}
           {{ order.financial_status_label }}
-        </p>
-        {{ order.billing_address | format_address }}
+        {%- endif -%}
+      </p>
+
+      {%- assign is_displayed_shipping_info = false -%}
+      {%- for item in order.line_items -%}
+        {%- for variant in item.product.variants -%}
+          {%- if variant.requires_shipping and is_displayed_shipping_info == false -%}
+            <h3 class="order-shipping-address-title">{{ 'customer.order.shipping_address' | t }}</h3>
+            {{ order.shipping_address | format_address | replace: "<p>","<p class='address-text'>" }}
+            {%- render 'pg_fulfillment_status_tag', order: order -%}
+            {%- assign is_displayed_shipping_info = true -%}
+            {%- break -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endfor -%}
+
+    </div>
+    <!--// PG ORDER ADDRESS END //-->
+
+    {% if settings.pg_use_print_receipt_app %}
+      <div class="grid__item">
+        <div class="print-receipt-container">
+          {% assign order_multiple = settings.pg_print_receipt_order_id_times_key %}
+          {% assign order_id = order.id | times: order_multiple %}
+          {% assign order_name = order.name | handleize %}
+          {% assign receipt_app_key = settings.pg_print_receipt_app_key %}
+          <div id="print-receipt"></div>
+          <script>
+            let htmlStr = '{{ settings.pg_use_print_receipt_html }}'.replace('_receiptappkey_', '{{ receipt_app_key }}');
+            htmlStr = htmlStr.replace('_orderid_', '{{ order_id }}');
+            htmlStr = htmlStr.replace('_ordername_', '{{ order_name }}');
+            document.getElementById('print-receipt').insertAdjacentHTML('beforeend', htmlStr);
+          </script>
+        </div>
       </div>
-      <div>
-        <h2>{{ 'customer.order.shipping_address' | t }}</h2>
-        <p>
-          <strong>{{ 'customer.order.fulfillment_status' | t }}:</strong>
-          {{ order.fulfillment_status_label }}
-        </p>
-        {{ order.shipping_address | format_address }}
-      </div>
+    {% endif %}
+
+    <div class="grid__item myaccount__back-button-container">
+      <a href="{{ routes.account_url }}">
+        <div>
+          <div class="myaccount__back-button-content">
+            <div class="myaccount__back-button-text">
+              {{ 'customer.account.return' | t }}
+            </div>
+          </div>
+        </div>
+      </a>
     </div>
   </div>
 </div>
+
+<!--// PG REFUND PAGE START //-->
+{%- include 'pg_refund' -%}
+<!--// PG REFUND PAGE END //-->
+
+<!--// PG REFUND CANCEL PAGE START //-->
+{%- include 'pg_refund_cancel' -%}
+<!--// PG REFUND CANCEL PAGE END //-->
